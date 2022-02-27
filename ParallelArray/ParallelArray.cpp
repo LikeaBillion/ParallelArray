@@ -40,7 +40,7 @@ void t_print(vector<T>& v) {
 
 //overloaded the<< operator for type image
 //also added a counter int that just outputs the count of the element printing out- useful for debugging
-int counter = 0;
+int counter = 0; 
 ostream& operator<<(ostream& out, const Images& r) {
     counter++;
     out << "{ counter: " << counter << " label: " << r.label << " file name: " << r.test_name << " distence: " << r.distance << " }" << endl;

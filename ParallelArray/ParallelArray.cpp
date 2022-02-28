@@ -88,10 +88,11 @@ void find_subfolders(string dir, vector<string>& subfolders) {
 
 }
 
+//bubble sort written to filter the distances by size
 void bubble_sort_distance(string** distance, int values) {
     for (int i = 0; i < values - 1; i++) {
         for (int j = 0; j < (values - i - 1); j++) {
-
+            //temp stores the values sorts then put them back in the array if needs to
             if (stoi(distance[0][j]) > stoi(distance[0][j + 1])) {
                 int temp1 = stoi(distance[0][j]);
                 int temp2 = stoi(distance[0][j + 1]);
@@ -105,7 +106,7 @@ void bubble_sort_distance(string** distance, int values) {
         }
     }
 }
-
+//function to read images parallely
 void read_images(vector<string>& sub_folders, vector<string>& filenames, list<Mat> &list_train_image_data,list<string> &list_labels, int start, int end, int depth) {
     Images train_img;
 
@@ -196,6 +197,7 @@ int main(int argc, char** argv)
         const int total_number_of_pixels = test_image.rows * test_image.cols * test_image.channels();
         const int train_size = list_train_image_data.size();
         convert_to_grayscale(test_input, test_output, 0, total_number_of_pixels, test_image.channels(),0);
+        //creating the 2d array with as many colomns as is necessary for the task
 
         string** distance = new string * [2];
         for (int i = 0; i < 2; ++i) {
@@ -205,54 +207,48 @@ int main(int argc, char** argv)
 
         for (int j = 0; j < train_size; j++) {
 
-            //storing the current training image as variable for easy access
-
+            //pulling current image from the list
             auto lt = list_train_image_data.begin();
             std::advance(lt, j);
-             
+
+            //storing the current training image as variable for easy access
             Mat train_img = *lt;
+            //storing total which is used to calculate distance
             double total = 0;
 
             //allocating memory for the train_input and train_outputs
             unsigned char* train_input = (unsigned char*)train_img.data;
             unsigned char* train_output = new unsigned char[train_img.size().width * train_img.size().height];
 
+            //calcuating greyscale
             convert_to_grayscale(train_input, train_output, 0, total_number_of_pixels, train_img.channels(),0);
 
-
-
+            //pulling from list labels
             auto ll = list_labels.begin();
             std::advance(ll, j);
 
             calculate_distance(test_output, train_output, 0, (total_number_of_pixels / 3), ref(total), 0);
-
+            //adding to the calculate distance array- for distance
             distance[0][j] = to_string(sqrt(total));
+            //adding to the calculate distance array- for labels
             distance[1][j] = *ll;
 
 
-            //calculating the distance, then storing with: test_name and labels
-            //distance_img.distance = calculate_distance(test_output, train_output, 0, (total_number_of_pixels /3));
-            //distance_img.label = train_image_data[j].label;
-            //distance_img.test_name = test_image_data[i].test_name;
-            //distance_data.push_back(distance_img);
+            
 
             delete[] train_output;
         }
 
-        //function to simply sort the values in the image vector strcuture
-        //sort(distance_data.begin(), distance_data.end(), [](Images a, Images b) {return a.distance < b.distance; });
-        //t_print(distance);
-        //call to calculate knn using the sorted values
-
+        //calling the bubble sort
         bubble_sort_distance(distance, train_size);
-
-        for (int h = 0; h < train_size; h++) {
+        //for testing output of distances from the array
+        /*for (int h = 0; h < train_size; h++) {
             cout << h << ": " << distance[0][h] << endl;
-        }
+        }*/
 
         calculate_knn(distance, stoi(k_value));
-        //cleared vector to keep processing time down and to remove potenial bias
-        //distance_data.clear();
+        
+        //deleting to avoid memory leaks 
         delete[] test_output;
         delete[] distance;
     }

@@ -1,77 +1,4 @@
-#include <opencv2/opencv.hpp>
-#include <iostream>
-#include <string>
-#include <future>
-#include <filesystem>
-#include <math.h>
-#include <filesystem>
-#include <list>
-#include <mutex>
-
-
-
-using namespace cv;
-using namespace std;
-using namespace chrono;
-
-mutex mu;
-
-//structure for storing images- test, training and the distences
-struct Images {
-    string label;
-    string test_name;
-    Mat train_img;
-    Mat test_img;
-    Mat grey_img;
-    double distance;
-
-    ~Images() {};
-
-    friend ostream& operator<<(ostream& out, const Images& r);
-
-};
-
-//simple template for printing vectors
-template <typename T>
-void t_print(vector<T>& v) {
-    if (v.empty()) return;
-    for (T& i : v) cout << i << endl;
-}
-
-//overloaded the<< operator for type image
-//also added a counter int that just outputs the count of the element printing out- useful for debugging
-int counter = 0; 
-ostream& operator<<(ostream& out, const Images& r) {
-    counter++;
-    out << "{ counter: " << counter << " label: " << r.label << " file name: " << r.test_name << " distence: " << r.distance << " }" << endl;
-    return out;
-}
-
-//serial implemntation of grayscaling
-void convert_to_grayscale(unsigned char* input, unsigned char* output, int start, int end,
-    int channel) {
-    //j is need to insure the output is ordered right.
-    int j = start;
-    int number_of_pixel = end;
-
-    for (int i = start; i < number_of_pixel; i += channel) {
-        int blue_value = input[i];
-        int green_value = input[i + 1];
-        int red_value = input[i + 2];
-        //shifts the pixels and then moves them into the output
-        output[j++] = (int)(0.114 * blue_value + 0.587 * green_value + 0.299 * red_value);
-    }
-}
-
-//function to calcualte the euclidian distance between the images
-double calculate_distance(unsigned char* testimg, unsigned char* trainimg, int start, int end) {
-    double total = 0;
-    for (int i = start; i < end; i++) {
-        total = +pow((testimg[i] - trainimg[i]), 2);
-    }
-    double dis = sqrt(total);
-    return dis;
-}
+#include "Header.h"
 
 //function to calculate the knn of the images- simply counts them and then prints the most common
 void calculate_knn(string** distance, int kvalue) {
@@ -169,8 +96,7 @@ void bubble_sort_distance(string** distance, int values) {
                 int temp1 = stoi(distance[0][j]);
                 int temp2 = stoi(distance[0][j + 1]);
                 string temp3 = distance[1][j];
-                string temp4 = distance[1][j + 1
-                ];
+                string temp4 = distance[1][j + 1];
                 distance[0][j] = to_string(temp2);
                 distance[0][j + 1] = to_string(temp1);
                 distance[1][j] = temp4;
@@ -183,7 +109,7 @@ void bubble_sort_distance(string** distance, int values) {
 void read_images(vector<string>& sub_folders, vector<string>& filenames, list<Mat> &list_train_image_data,list<string> &list_labels, int start, int end, int depth) {
     Images train_img;
 
-    if (depth > 2) {
+    if (depth > 4) {
         scoped_lock<mutex> sl(mu);
         for (int j = start; j < end; j++) {
             list_train_image_data.push_back(imread(filenames[j]));
@@ -220,8 +146,6 @@ int main(int argc, char** argv)
 
     //image vectors for testing, training and distance data
     vector<Images> test_image_data;
-    vector<Images> train_image_data;
-    vector<Images> distance_data;
     list<Mat> list_train_image_data;
     list<string> list_labels;
 
@@ -271,7 +195,7 @@ int main(int argc, char** argv)
         //count for the max number of pixels
         const int total_number_of_pixels = test_image.rows * test_image.cols * test_image.channels();
         const int train_size = list_train_image_data.size();
-        convert_to_grayscale(test_input, test_output, 0, total_number_of_pixels, test_image.channels());
+        convert_to_grayscale(test_input, test_output, 0, total_number_of_pixels, test_image.channels(),0);
 
         string** distance = new string * [2];
         for (int i = 0; i < 2; ++i) {
@@ -285,22 +209,24 @@ int main(int argc, char** argv)
 
             auto lt = list_train_image_data.begin();
             std::advance(lt, j);
-
+             
             Mat train_img = *lt;
+            double total = 0;
 
             //allocating memory for the train_input and train_outputs
             unsigned char* train_input = (unsigned char*)train_img.data;
             unsigned char* train_output = new unsigned char[train_img.size().width * train_img.size().height];
 
-            convert_to_grayscale(train_input, train_output, 0, total_number_of_pixels, train_img.channels());
+            convert_to_grayscale(train_input, train_output, 0, total_number_of_pixels, train_img.channels(),0);
 
 
 
             auto ll = list_labels.begin();
             std::advance(ll, j);
 
+            calculate_distance(test_output, train_output, 0, (total_number_of_pixels / 3), ref(total), 0);
 
-            distance[0][j] = to_string(calculate_distance(test_output, train_output, 0, (total_number_of_pixels / 3)));
+            distance[0][j] = to_string(sqrt(total));
             distance[1][j] = *ll;
 
 
@@ -310,7 +236,7 @@ int main(int argc, char** argv)
             //distance_img.test_name = test_image_data[i].test_name;
             //distance_data.push_back(distance_img);
 
-
+            delete[] train_output;
         }
 
         //function to simply sort the values in the image vector strcuture
@@ -321,21 +247,23 @@ int main(int argc, char** argv)
         bubble_sort_distance(distance, train_size);
 
         for (int h = 0; h < train_size; h++) {
-            cout << h <<": " << distance[0][h] << endl;
+            cout << h << ": " << distance[0][h] << endl;
         }
 
-        //calculate_knn(distance, stoi(k_value));
+        calculate_knn(distance, stoi(k_value));
         //cleared vector to keep processing time down and to remove potenial bias
         //distance_data.clear();
+        delete[] test_output;
+        delete[] distance;
     }
 
     //ending timing
     auto end = steady_clock::now();
     //calculating duration
-    auto duration_s = duration_cast<seconds> (end - start).count();
+    double duration_p = duration_cast<milliseconds> (end - start).count();
     cout << "----------------------------------------------------------" << endl;
-    //outputing serial time
-    cout << "Serial time: " << duration_s << endl;
+    //outputing parallel time
+    cout << "Paralell time: " << duration_p/1000 << endl;
 
     return 0;
 }
